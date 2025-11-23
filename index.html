@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlackForce Puzzle</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #0a0a0f;
+            --secondary: #1a1a2e;
+            --accent: #4a4a6a;
+            --highlight: #6a6a9a;
+            --text: #e0e0f0;
+            --text-dim: #a0a0c0;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --danger: #ef4444;
+            --metallic: linear-gradient(145deg, #2a2a3a, #1a1a2a);
+            --metallic-border: linear-gradient(145deg, #3a3a5a, #0a0a1a);
+            --glow: 0 0 10px rgba(106, 106, 154, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: var(--primary);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            width: 100%;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Styles */
+        header {
+            text-align: center;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--accent);
+            margin-bottom: 20px;
+            background: var(--metallic);
+            border-radius: 12px;
+            box-shadow: var(--glow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--highlight), transparent);
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+            background: linear-gradient(to right, #e0e0f0, #a0a0c0);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        /* Game Stats */
+        .stats-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: var(--metallic);
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--accent);
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--highlight);
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Game Board */
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            margin: 20px 0;
+            aspect-ratio: 1;
+            background: var(--secondary);
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: var(--glow);
+            border: 1px solid var(--accent);
+        }
+
+        .tile {
+            background: var(--metallic);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--accent);
+            user-select: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tile::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 50%);
+            pointer-events: none;
+        }
+
+        .tile:hover {
+            transform: scale(0.98);
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.7);
+        }
+
+        .tile.selected {
+            border: 2px solid var(--highlight);
+            box-shadow: 0 0 15px var(--highlight);
+        }
+
+        .tile.empty {
+            background: transparent;
+            box-shadow: none;
+            border: 1px dashed var(--accent);
+            cursor: default;
+        }
+
+        .tile.empty::after {
+            display: none;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(to bottom, var(--highlight), var(--accent));
+            color: white;
+            box-shadow: 0 4px 0 var(--accent);
+        }
+
+        .btn-primary:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: var(--metallic);
+            color: var(--text);
+            border: 1px solid var(--accent);
+        }
+
+        .btn-secondary:active {
+            background: var(--secondary);
+        }
+
+        /* Login Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: var(--metallic);
+            border-radius: 12px;
+            padding: 25px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: var(--glow);
+            border: 1px solid var(--accent);
+            position: relative;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .modal h2 {
+            margin-bottom: 20px;
+            text-align: center;
+            color: var(--text);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            background: var(--secondary);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--highlight);
+            box-shadow: 0 0 0 2px rgba(106, 106, 154, 0.3);
+        }
+
+        /* Leaderboard */
+        .leaderboard {
+            margin-top: 20px;
+            background: var(--metallic);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: var(--glow);
+            border: 1px solid var(--accent);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .leaderboard h2 {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            color: var(--highlight);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .leaderboard-list {
+            list-style: none;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid var(--accent);
+        }
+
+        .leaderboard-item:last-child {
+            border-bottom: none;
+        }
+
+        .leaderboard-rank {
+            font-weight: bold;
+            color: var(--highlight);
+            width: 30px;
+        }
+
+        .leaderboard-name {
+            flex: 1;
+            text-align: left;
+            padding: 0 10px;
+        }
+
+        .leaderboard-score {
+            font-weight: bold;
+            color: var(--text);
+            width: 80px;
+            text-align: right;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .stats-container {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            
+            .stat-box {
+                padding: 10px;
+            }
+            
+            .game-board {
+                gap: 4px;
+                padding: 8px;
+            }
+            
+            .tile {
+                font-size: 1.2rem;
+            }
+            
+            .btn {
+                padding: 10px;
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .pulse {
+            animation: pulse 0.5s ease;
+        }
+
+        @keyframes confetti {
+            0% { transform: translateY(0) rotate(0); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background: var(--highlight);
+            opacity: 0;
+            animation: confetti 3s ease-in-out forwards;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>BlackForce Puzzle</h1>
+            <p class="subtitle">Rearrange the tiles to solve the puzzle</p>
+        </header>
+
+        <div class="stats-container">
+            <div class="stat-box">
+                <div class="stat-value" id="timer">00:00</div>
+                <div class="stat-label">Time</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="moves">0</div>
+                <div class="stat-label">Moves</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="score">0</div>
+                <div class="stat-label">Score</div>
+            </div>
+        </div>
+
+        <div class="game-board" id="game-board">
+            <!-- Tiles will be generated by JavaScript -->
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" id="shuffle-btn">
+                <i class="fas fa-random"></i> Shuffle
+            </button>
+            <button class="btn btn-secondary" id="leaderboard-btn">
+                <i class="fas fa-trophy"></i> Leaderboard
+            </button>
+        </div>
+
+        <div class="leaderboard">
+            <h2>Top Scores</h2>
+            <ul class="leaderboard-list" id="leaderboard-list">
+                <!-- Leaderboard items will be populated by JavaScript -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal" id="login-modal">
+        <div class="modal-content">
+            <button class="close-modal" id="close-modal">&times;</button>
+            <h2>Save Your Score</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="player-name">Your Name</label>
+                    <input type="text" id="player-name" class="form-control" placeholder="Enter your name" required>
+                </div>
+                <div class="form-group">
+                    <label for="player-email">Email (optional)</label>
+                    <input type="email" id="player-email" class="form-control" placeholder="Enter your email">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+                    <i class="fas fa-save"></i> Save Score
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        const gameState = {
+            tiles: [],
+            emptyIndex: 15,
+            moves: 0,
+            time: 0,
+            timerInterval: null,
+            score: 0,
+            isPlaying: false,
+            selectedTile: null,
+            combo: 0,
+            maxCombo: 0
+        };
+
+        // DOM elements
+        const gameBoard = document.getElementById('game-board');
+        const timerElement = document.getElementById('timer');
+        const movesElement = document.getElementById('moves');
+        const scoreElement = document.getElementById('score');
+        const shuffleBtn = document.getElementById('shuffle-btn');
+        const leaderboardBtn = document.getElementById('leaderboard-btn');
+        const loginModal = document.getElementById('login-modal');
+        const closeModal = document.getElementById('close-modal');
+        const loginForm = document.getElementById('login-form');
+        const leaderboardList = document.getElementById('leaderboard-list');
+
+        // Initialize the game
+        function initGame() {
+            createTiles();
+            renderTiles();
+            startTimer();
+            
+            // Add event listeners
+            shuffleBtn.addEventListener('click', shuffleTiles);
+            leaderboardBtn.addEventListener('click', showLeaderboard);
+            closeModal.addEventListener('click', () => loginModal.style.display = 'none');
+            loginForm.addEventListener('submit', saveScore);
+            
+            // Load leaderboard
+            loadLeaderboard();
+            
+            // Set up leaderboard polling
+            setInterval(loadLeaderboard, 5000);
+        }
+
+        // Create the tiles
+        function createTiles() {
+            gameState.tiles = [];
+            for (let i = 1; i <= 15; i++) {
+                gameState.tiles.push(i);
+            }
+            gameState.tiles.push(null); // Empty tile
+        }
+
+        // Render tiles on the board
+        function renderTiles() {
+            gameBoard.innerHTML = '';
+            gameState.tiles.forEach((tile, index) => {
+                const tileElement = document.createElement('div');
+                tileElement.className = 'tile';
+                
+                if (tile === null) {
+                    tileElement.classList.add('empty');
+                    tileElement.textContent = '';
+                } else {
+                    tileElement.textContent = tile;
+                    
+                    // Add click event for tile selection
+                    tileElement.addEventListener('click', () => selectTile(index));
+                }
+                
+                gameBoard.appendChild(tileElement);
+            });
+        }
+
+        // Select a tile for swapping
+        function selectTile(index) {
+            if (!gameState.isPlaying || gameState.tiles[index] === null) return;
+            
+            const tileElement = gameBoard.children[index];
+            
+            // If no tile is selected, select this one
+            if (gameState.selectedTile === null) {
+                gameState.selectedTile = index;
+                tileElement.classList.add('selected');
+                return;
+            }
+            
+            // If the same tile is clicked again, deselect it
+            if (gameState.selectedTile === index) {
+                gameState.selectedTile = null;
+                tileElement.classList.remove('selected');
+                return;
+            }
+            
+            // Try to swap the selected tile with the clicked tile
+            swapTiles(gameState.selectedTile, index);
+            
+            // Deselect after swapping
+            gameBoard.children[gameState.selectedTile].classList.remove('selected');
+            gameState.selectedTile = null;
+        }
+
+        // Swap two tiles
+        function swapTiles(index1, index2) {
+            // Check if the tiles are adjacent
+            if (!isAdjacent(index1, index2)) return;
+            
+            // Swap tiles in the array
+            [gameState.tiles[index1], gameState.tiles[index2]] = [gameState.tiles[index2], gameState.tiles[index1]];
+            
+            // Update empty index
+            if (gameState.tiles[index1] === null) gameState.emptyIndex = index1;
+            if (gameState.tiles[index2] === null) gameState.emptyIndex = index2;
+            
+            // Update game state
+            gameState.moves++;
+            updateStats();
+            
+            // Check if the move is correct (part of the solution)
+            if (isCorrectMove(index1, index2)) {
+                gameState.combo++;
+                if (gameState.combo > gameState.maxCombo) {
+                    gameState.maxCombo = gameState.combo;
+                }
+                
+                // Visual feedback for correct move
+                gameBoard.children[index1].classList.add('pulse');
+                gameBoard.children[index2].classList.add('pulse');
+                
+                setTimeout(() => {
+                    gameBoard.children[index1].classList.remove('pulse');
+                    gameBoard.children[index2].classList.remove('pulse');
+                }, 500);
+            } else {
+                gameState.combo = 0;
+            }
+            
+            // Re-render the board
+            renderTiles();
+            
+            // Check if puzzle is solved
+            if (isSolved()) {
+                endGame();
+            }
+        }
+
+        // Check if two tiles are adjacent
+        function isAdjacent(index1, index2) {
+            const row1 = Math.floor(index1 / 4);
+            const col1 = index1 % 4;
+            const row2 = Math.floor(index2 / 4);
+            const col2 = index2 % 4;
+            
+            return (
+                (Math.abs(row1 - row2) === 1 && col1 === col2) ||
+                (Math.abs(col1 - col2) === 1 && row1 === row2)
+            );
+        }
+
+        // Check if the move is correct (moving a tile toward its correct position)
+        function isCorrectMove(index1, index2) {
+            // This is a simplified check - in a real implementation, you'd want more sophisticated logic
+            const value1 = gameState.tiles[index1];
+            const value2 = gameState.tiles[index2];
+            
+            // If one of the tiles is the empty space, check if the other is moving toward its correct position
+            if (value1 === null) {
+                return index2 === getCorrectPosition(value2);
+            }
+            if (value2 === null) {
+                return index1 === getCorrectPosition(value1);
+            }
+            
+            return false;
+        }
+
+        // Get the correct position for a tile value
+        function getCorrectPosition(value) {
+            if (value === null) return 15;
+            return value - 1;
+        }
+
+        // Check if the puzzle is solved
+        function isSolved() {
+            for (let i = 0; i < 15; i++) {
+                if (gameState.tiles[i] !== i + 1) {
+                    return false;
+                }
+            }
+            return gameState.tiles[15] === null;
+        }
+
+        // Shuffle the tiles
+        function shuffleTiles() {
+            // Reset game state
+            gameState.moves = 0;
+            gameState.time = 0;
+            gameState.score = 0;
+            gameState.combo = 0;
+            gameState.maxCombo = 0;
+            gameState.selectedTile = null;
+            gameState.isPlaying = true;
+            
+            // Create a solvable shuffle
+            do {
+                // Fisher-Yates shuffle
+                for (let i = gameState.tiles.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [gameState.tiles[i], gameState.tiles[j]] = [gameState.tiles[j], gameState.tiles[i]];
+                }
+                
+                // Update empty index
+                gameState.emptyIndex = gameState.tiles.indexOf(null);
+            } while (!isSolvable() || isSolved());
+            
+            // Update stats and render
+            updateStats();
+            renderTiles();
+            
+            // Restart timer
+            clearInterval(gameState.timerInterval);
+            startTimer();
+        }
+
+        // Check if the current tile arrangement is solvable
+        function isSolvable() {
+            // For a 4x4 puzzle, a configuration is solvable if:
+            // (inversions + row of blank) is odd
+            let inversions = 0;
+            const tiles = gameState.tiles.filter(tile => tile !== null);
+            
+            for (let i = 0; i < tiles.length; i++) {
+                for (let j = i + 1; j < tiles.length; j++) {
+                    if (tiles[i] > tiles[j]) {
+                        inversions++;
+                    }
+                }
+            }
+            
+            const blankRow = 4 - Math.floor(gameState.emptyIndex / 4);
+            return (inversions + blankRow) % 2 === 1;
+        }
+
+        // Start the game timer
+        function startTimer() {
+            clearInterval(gameState.timerInterval);
+            gameState.time = 0;
+            updateTimerDisplay();
+            
+            gameState.timerInterval = setInterval(() => {
+                gameState.time++;
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        // Update the timer display
+        function updateTimerDisplay() {
+            const minutes = Math.floor(gameState.time / 60);
+            const seconds = gameState.time % 60;
+            timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Update all game stats
+        function updateStats() {
+            movesElement.textContent = gameState.moves;
+            
+            // Calculate score: higher score for fewer moves and less time, with combo bonus
+            const timeBonus = Math.max(0, 300 - gameState.time) * 10;
+            const movePenalty = gameState.moves * 5;
+            const comboBonus = gameState.maxCombo * 20;
+            
+            gameState.score = Math.max(0, timeBonus - movePenalty + comboBonus);
+            scoreElement.textContent = gameState.score;
+        }
+
+        // End the game
+        function endGame() {
+            clearInterval(gameState.timerInterval);
+            gameState.isPlaying = false;
+            
+            // Show celebration
+            createConfetti();
+            
+            // Show login modal to save score
+            setTimeout(() => {
+                loginModal.style.display = 'flex';
+            }, 1000);
+        }
+
+        // Create confetti effect
+        function createConfetti() {
+            const colors = ['#6a6a9a', '#4a4a6a', '#a0a0c0', '#e0e0f0'];
+            
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.width = Math.random() * 10 + 5 + 'px';
+                confetti.style.height = Math.random() * 10 + 5 + 'px';
+                confetti.style.animationDelay = Math.random() * 2 + 's';
+                
+                document.body.appendChild(confetti);
+                
+                // Remove confetti after animation
+                setTimeout(() => {
+                    confetti.remove();
+                }, 5000);
+            }
+        }
+
+        // Show leaderboard
+        function showLeaderboard() {
+            loadLeaderboard();
+            // In a real implementation, you might want to show a modal with a more detailed leaderboard
+            alert('Leaderboard is displayed below. It updates every 5 seconds.');
+        }
+
+        // Load leaderboard from Supabase
+        async function loadLeaderboard() {
+            // In a real implementation, you would fetch from Supabase
+            // For this demo, we'll use mock data
+            const mockLeaderboard = [
+                { rank: 1, name: 'Player1', score: 2850 },
+                { rank: 2, name: 'PuzzleMaster', score: 2740 },
+                { rank: 3, name: 'TileExpert', score: 2630 },
+                { rank: 4, name: 'GameChamp', score: 2520 },
+                { rank: 5, name: 'SliderPro', score: 2410 },
+                { rank: 6, name: 'BrainyPlayer', score: 2300 },
+                { rank: 7, name: 'QuickMind', score: 2190 },
+                { rank: 8, name: 'StrategyGuru', score: 2080 },
+                { rank: 9, name: 'PuzzleSolver', score: 1970 },
+                { rank: 10, name: 'NewPlayer', score: 1860 }
+            ];
+            
+            // Update leaderboard UI
+            leaderboardList.innerHTML = '';
+            mockLeaderboard.forEach(entry => {
+                const item = document.createElement('li');
+                item.className = 'leaderboard-item';
+                item.innerHTML = `
+                    <span class="leaderboard-rank">${entry.rank}</span>
+                    <span class="leaderboard-name">${entry.name}</span>
+                    <span class="leaderboard-score">${entry.score}</span>
+                `;
+                leaderboardList.appendChild(item);
+            });
+        }
+
+        // Save score to Supabase
+        async function saveScore(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('player-name').value;
+            const email = document.getElementById('player-email').value;
+            
+            if (!name) {
+                alert('Please enter your name');
+                return;
+            }
+            
+            // In a real implementation, you would save to Supabase
+            // For this demo, we'll just show a success message
+            console.log(`Score saved: ${name} (${email}) - ${gameState.score}`);
+            
+            // Close modal and reset form
+            loginModal.style.display = 'none';
+            loginForm.reset();
+            
+            // Show success message
+            alert(`Score saved successfully! ${name} - ${gameState.score} points`);
+        }
+
+        // Initialize the game when the page loads
+        window.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>
